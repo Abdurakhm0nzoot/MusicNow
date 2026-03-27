@@ -5,7 +5,6 @@ import shutil
 import subprocess
 import aiohttp
 from aiohttp import web
-from shazamio import Shazam
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.types import (
     InlineKeyboardMarkup, InlineKeyboardButton, FSInputFile
@@ -27,7 +26,6 @@ ADMIN_ID = os.getenv("ADMIN_ID", "")
 
 bot: Bot = None
 dp = Dispatcher()
-shazam = Shazam()
 
 # Хранилище результатов поиска {user_id: [results]}
 search_cache = {}
@@ -42,22 +40,17 @@ MESSAGES = {
             "Я — <b>🎵 Music & Video Downloader Bot</b>\n\n"
             "Что я умею:\n"
             "🔍 <b>Поиск</b>: Просто напиши название песни.\n"
-            "🔗 <b>Ссылки</b>: Пришли ссылку на YouTube, TikTok, Instagram или VK.\n"
-            "🎧 <b>Shazam</b>: Отправь мне голосовое сообщение или 'кружочек', и я узнаю, что за музыка играет!\n\n"
-            "✨ Просто напиши название или прикрепи файл!"
+            "🔗 <b>Ссылки</b>: Пришли ссылку на YouTube, TikTok, Instagram или VK.\n\n"
+            "✨ Просто напиши название или отправь ссылку!"
         ),
         'help': "📖 <b>Помощь:</b>\n\n"
-                  "Отправь название песни или ссылку на видео.\n"
-                  "Отправь аудио/войс — распознаю трек.\n\n"
+                  "Отправь название песни или ссылку на видео.\n\n"
                   "Есть вопросы? Нажми кнопку ниже ✍️",
         'searching': "🔎 Ищу музыку...",
         'not_found': "❌ Ничего не найдено.",
         'full_music_found': "🎵 <b>Полная версия найдена!</b>\nВыберите подходящий вариант ниже:",
         'dl_start': "⏬ Начинаю скачивание...",
         'dl_error': "❌ Ошибка при скачивании.",
-        'shazam_start': "🎧 Подключаюсь к Shazam... Распознаю музыку...",
-        'shazam_not_found': "❌ Музыка не распознана.",
-        'shazam_success': "✅ Трек найден: <b>{query}</b>!",
         'btn_audio': "🎵 Аудио (MP3)",
         'btn_video': "🎬 Видео (MP4)",
         'btn_cancel': "❌ Отмена",
@@ -72,22 +65,17 @@ MESSAGES = {
             "I'm <b>🎵 Music & Video Downloader Bot</b>\n\n"
             "What I can do:\n"
             "🔍 <b>Search</b>: Just type the song name.\n"
-            "🔗 <b>Links</b>: Send a link from YouTube, TikTok, Instagram, or VK.\n"
-            "🎧 <b>Shazam</b>: Send me a voice message or video note, and I'll find the music!\n\n"
-            "Just type a name or send a file!"
+            "🔗 <b>Links</b>: Send a link from YouTube, TikTok, Instagram, or VK.\n\n"
+            "Just type a name or send a link!"
         ),
         'help': "📖 <b>Help:</b>\n\n"
-                  "Send a song title or a video link.\n"
-                  "Send an audio/voice — I'll shazam it.\n\n"
+                  "Send a song title or a video link.\n\n"
                   "Any questions? Tap below ✍️",
         'searching': "🔎 Searching...",
         'not_found': "❌ Nothing found.",
         'full_music_found': "🎵 <b>Full version found!</b>\nSelect the best option below:",
         'dl_start': "⏬ Downloading...",
         'dl_error': "❌ Download error.",
-        'shazam_start': "🎧 Connecting to Shazam... Recognizing...",
-        'shazam_not_found': "❌ Music not recognized.",
-        'shazam_success': "✅ Track found: <b>{query}</b>!",
         'btn_audio': "🎵 Audio (MP3)",
         'btn_video': "🎬 Video (MP4)",
         'btn_cancel': "❌ Cancel",
@@ -102,22 +90,17 @@ MESSAGES = {
             "Men — <b>🎵 Music & Video Downloader Bot</b>\n\n"
             "Nimalar qila olaman:\n"
             "🔍 <b>Izlash</b>: Shunchaki qoʻshiq nomini yozing.\n"
-            "🔗 <b>Havolalar</b>: YouTube, TikTok, Instagram yoki VK havolasini yuboring.\n"
-            "🎧 <b>Shazam</b>: Menga ovozli xabar yoki 'krujok' yuboring va men musiqani topaman!\n\n"
+            "🔗 <b>Havolalar</b>: YouTube, TikTok, Instagram yoki VK havolasini yuboring.\n\n"
             "Ismni yozing yoki faylni yuboring!"
         ),
         'help': "📖 <b>Yordam:</b>\n\n"
-                  "Qoʻshiq nomini yoki video havolasini yuboring.\n"
-                  "Ovozli xabar yuboring — men musiqani topaman.\n\n"
+                  "Qoʻshiq nomini yoki video havolasini yuboring.\n\n"
                   "Savollar bormi? Pastdagi tugmani bosing ✍️",
         'searching': "🔎 Qidirilmoqda...",
         'not_found': "❌ Hech narsa topilmadi.",
         'full_music_found': "🎵 <b>To'liq versiya topildi!</b>\nQuyidagidan birini tanlang:",
         'dl_start': "⏬ Yuklab olinmoqda...",
         'dl_error': "❌ Yuklab olishda xato.",
-        'shazam_start': "🎧 Shazamga ulanmoqda... Aniqlanmoqda...",
-        'shazam_not_found': "❌ Musiqa aniqlanmadi.",
-        'shazam_success': "✅ Trek topildi: <b>{query}</b>!",
         'btn_audio': "🎵 Audio (MP3)",
         'btn_video': "🎬 Video (MP4)",
         'btn_cancel': "❌ Bekor qilish",
@@ -138,10 +121,10 @@ async def update_bot_profile_stats():
     total = stats.get('total', 0)
     
     if total > 100:
-        desc_text = f"🎵 Fast Music & Video Downloader\n\n👥 We are already {total} users!\n\n🔍 Search music\n🔗 Get video/audio from any link\n🎧 Shazam any sounds\n\nStart now!"
+        desc_text = f"🎵 Fast Music & Video Downloader\n\n👥 We are already {total} users!\n\n🔍 Search music\n🔗 Get video/audio from any link\n\nStart now!"
         short_desc = f"🎵 Music Downloader | 👥 {total} users!"
     else:
-        desc_text = "🎵 Fast Music & Video Downloader\n\n🔍 Search music\n🔗 Get video/audio links\n🎧 Shazam any sounds\n\nStart now!"
+        desc_text = "🎵 Fast Music & Video Downloader\n\n🔍 Search music\n🔗 Get video/audio links\n\nStart now!"
         short_desc = "🎵 Music Downloader | Fast & Free!"
 
     try:
@@ -306,34 +289,6 @@ async def admin_reply(message: types.Message):
         await message.answer("✅ Reply sent!")
     except Exception as e: await message.answer(f"❌ Error: {e}")
 
-# ===================== SHAZAM =====================
-
-@dp.message(F.voice | F.audio | F.video_note)
-async def handle_shazam(message: types.Message):
-    if download_url_cache.get(message.from_user.id) == "waiting_feedback": return
-    lang = get_lang(message.from_user.id)
-    msg = await message.reply(MESSAGES[lang]['shazam_start'])
-    try:
-        if message.voice: f_id = message.voice.file_id
-        elif message.audio: f_id = message.audio.file_id
-        else: f_id = message.video_note.file_id
-        file = await bot.get_file(f_id)
-        if not os.path.exists("downloads"): os.makedirs("downloads")
-        path = f"downloads/{f_id}.ogg"
-        await bot.download_file(file.file_path, path)
-        out = await shazam.recognize(path)
-        if os.path.exists(path): os.remove(path)
-        if out.get('track'):
-            t = out['track']; q = f"{t.get('subtitle')} {t.get('title')}".strip()
-            await msg.edit_text(MESSAGES[lang]['shazam_success'].format(query=q), parse_mode="HTML")
-            res = await search_music(q)
-            if res:
-                search_cache[message.from_user.id] = res
-                prompt = MESSAGES[lang]['full_music_found']
-                await msg.edit_text(f"✅ {q}\n\n{prompt}", reply_markup=build_results_keyboard(res, lang), parse_mode="HTML")
-        else: await msg.edit_text(MESSAGES[lang]['shazam_not_found'])
-    except: await msg.edit_text(MESSAGES[lang]['shazam_not_found'])
-
 # ===================== TEXT & LINKS =====================
 
 @dp.message(F.text)
@@ -432,7 +387,6 @@ async def main():
     port = int(os.environ.get("PORT", 10000))
     site = web.TCPSite(runner, '0.0.0.0', port)
     
-    print(f"Server started on port {port}")
     await update_bot_profile_stats()
     
     # Запускаем и бота, и сервер одновременно
