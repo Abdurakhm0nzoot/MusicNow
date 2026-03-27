@@ -1,0 +1,5 @@
+aiogram
+shazamio
+aiohttp
+yt-dlp
+python-dotenv
