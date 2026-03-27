@@ -9,17 +9,28 @@ from typing import Tuple, Optional, List, Dict
 def search_music_sync(query: str, max_results: int = 8) -> Optional[List[Dict]]:
     """
     Ищет треки на YouTube без скачивания. Возвращает список результатов.
+    Обновлено для обхода блокировок на Render (IPv4 + User-Agent).
     """
     ydl_opts = {
+        'format': 'bestaudio/best',
         'quiet': True,
         'no_warnings': True,
         'default_search': 'ytsearch',
         'noplaylist': True,
-        'extract_flat': False,
+        'extract_flat': True,
+        'nocheckcertificate': True,
+        'source_address': '0.0.0.0', # Принудительно IPv4 (решает проблему 403 на Render)
+        'http_headers': {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Referer': 'https://www.google.com/',
+        }
     }
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            # Используем ytsearch без лимита внутри строки, если нужно 8 результатов
             info = ydl.extract_info(f"ytsearch{max_results}:{query}", download=False)
 
             if 'entries' not in info or not info['entries']:
@@ -49,6 +60,7 @@ def search_music_sync(query: str, max_results: int = 8) -> Optional[List[Dict]]:
 def download_by_id_sync(video_id: str) -> Optional[Tuple[str, str, str, int]]:
     """
     Скачивает конкретное видео (аудио) по его ID.
+    Обновлено для работы на серверных IP.
     """
     ydl_opts = {
         'format': 'bestaudio[ext=m4a]/bestaudio/best',
@@ -56,6 +68,11 @@ def download_by_id_sync(video_id: str) -> Optional[Tuple[str, str, str, int]]:
         'noplaylist': True,
         'quiet': True,
         'no_warnings': True,
+        'nocheckcertificate': True,
+        'source_address': '0.0.0.0',
+        'http_headers': {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        }
     }
 
     try:
@@ -66,7 +83,6 @@ def download_by_id_sync(video_id: str) -> Optional[Tuple[str, str, str, int]]:
             url = f"https://www.youtube.com/watch?v={video_id}"
             info = ydl.extract_info(url, download=True)
 
-            # Находим скачанный файл
             matching_files = glob.glob(f"downloads/{video_id}.*")
             if matching_files:
                 filename = matching_files[0]
@@ -88,9 +104,8 @@ def download_by_id_sync(video_id: str) -> Optional[Tuple[str, str, str, int]]:
         return None
 
 
-# ========== Новые функции для скачивания по ссылке ==========
+# ========== Функции для скачивания по ссылке ==========
 
-# Паттерны ссылок которые мы поддерживаем
 URL_PATTERN = re.compile(
     r'https?://'
     r'(?:www\.)?'
@@ -102,7 +117,7 @@ URL_PATTERN = re.compile(
     r'|twitter\.com/|x\.com/'  # Twitter/X
     r'|vk\.com/video|vk\.com/clip'  # VK
     r'|soundcloud\.com/'  # SoundCloud
-    r'|open\.spotify\.com/'  # Spotify (только метаданные)
+    r'|open\.spotify\.com/'  # Spotify
     r'|music\.apple\.com/'  # Apple Music
     r'|reddit\.com/'  # Reddit
     r'|facebook\.com/.*video'  # Facebook
@@ -113,21 +128,22 @@ URL_PATTERN = re.compile(
 
 
 def is_supported_url(text: str) -> Optional[str]:
-    """Проверяет, содержит ли текст поддерживаемую ссылку. Возвращает URL или None."""
     match = URL_PATTERN.search(text)
     return match.group(0) if match else None
 
 
 def download_audio_from_url_sync(url: str) -> Optional[Dict]:
-    """
-    Скачивает аудио по ссылке. Возвращает dict с информацией о файле.
-    """
     ydl_opts = {
         'format': 'bestaudio[ext=m4a]/bestaudio/best',
         'outtmpl': 'downloads/%(id)s_audio.%(ext)s',
         'noplaylist': True,
         'quiet': True,
         'no_warnings': True,
+        'nocheckcertificate': True,
+        'source_address': '0.0.0.0',
+        'http_headers': {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        }
     }
 
     try:
@@ -162,17 +178,18 @@ def download_audio_from_url_sync(url: str) -> Optional[Dict]:
 
 
 def download_video_from_url_sync(url: str) -> Optional[Dict]:
-    """
-    Скачивает видео по ссылке. Возвращает dict с информацией о файле.
-    Ограничение: до 50MB для телеграма.
-    """
     ydl_opts = {
         'format': 'best[filesize<50M]/best[height<=720]/best',
         'outtmpl': 'downloads/%(id)s_video.%(ext)s',
         'noplaylist': True,
         'quiet': True,
         'no_warnings': True,
+        'nocheckcertificate': True,
+        'source_address': '0.0.0.0',
         'merge_output_format': 'mp4',
+        'http_headers': {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        }
     }
 
     try:
@@ -183,7 +200,6 @@ def download_video_from_url_sync(url: str) -> Optional[Dict]:
             info = ydl.extract_info(url, download=True)
 
             video_id = info.get('id', 'unknown')
-            # Ищем скачанный файл
             matching_files = glob.glob(f"downloads/{video_id}_video.*")
             if matching_files:
                 filename = matching_files[0]
@@ -194,7 +210,6 @@ def download_video_from_url_sync(url: str) -> Optional[Dict]:
             if not os.path.exists(filename):
                 return None
 
-            # Проверяем размер файла (лимит Telegram ~50MB)
             file_size = os.path.getsize(filename)
             if file_size > 50 * 1024 * 1024:
                 os.remove(filename)
@@ -237,21 +252,18 @@ async def download_video_from_url(url: str) -> Optional[Dict]:
 
 
 def get_original_track_query_sync(url: str) -> Optional[str]:
-    """Пытается найти название оригинального трека из метаданных видео."""
     ydl_opts = {
         'noplaylist': True,
         'quiet': True,
         'no_warnings': True,
         'extract_flat': True,
+        'source_address': '0.0.0.0',
     }
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # Не скачиваем, просто берем инфо
             info = ydl.extract_info(url, download=False)
-            
             track = info.get('track')
             artist = info.get('artist')
-            
             if track:
                 if artist:
                     return f"{artist} - {track}"
