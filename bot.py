@@ -4,6 +4,7 @@ import os
 import shutil
 import subprocess
 import aiohttp
+from aiohttp import web
 from shazamio import Shazam
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.types import (
@@ -136,7 +137,6 @@ async def update_bot_profile_stats():
     stats = db.get_stats()
     total = stats.get('total', 0)
     
-    # Показываем число только если пользователей больше 100
     if total > 100:
         desc_text = f"🎵 Fast Music & Video Downloader\n\n👥 We are already {total} users!\n\n🔍 Search music\n🔗 Get video/audio from any link\n🎧 Shazam any sounds\n\nStart now!"
         short_desc = f"🎵 Music Downloader | 👥 {total} users!"
@@ -148,6 +148,10 @@ async def update_bot_profile_stats():
         await bot.set_my_short_description(short_desc)
         await bot.set_my_description(desc_text)
     except: pass
+
+async def handle_ping(request):
+    """Мини-сайт для обхода сна на Render Free Tier."""
+    return web.Response(text="🎵 Music Bot is running!")
 
 def build_lang_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -294,7 +298,6 @@ async def contact_admin_start(callback: types.CallbackQuery):
 
 @dp.message(Command("reply"))
 async def admin_reply(message: types.Message):
-    """Admin replies to user: /reply ID text"""
     if str(message.from_user.id) != str(ADMIN_ID): return
     parts = message.text.split(" ", 2)
     if len(parts) < 3: return
@@ -357,7 +360,7 @@ async def handle_text(message: types.Message):
         await status.edit_text(f"🔍 {message.text}\n\n{prompt}", reply_markup=build_results_keyboard(res, lang), parse_mode="HTML")
     else: await status.edit_text(MESSAGES[lang]['not_found'])
 
-# ... (callbacks remain the same)
+# ===================== CALLBACKS =====================
 
 @dp.callback_query(F.data == "dl_audio")
 async def dl_audio(callback: types.CallbackQuery):
@@ -420,8 +423,23 @@ async def main():
     bot = Bot(token=BOT_TOKEN)
     if os.path.exists("downloads"): shutil.rmtree("downloads")
     os.makedirs("downloads")
+    
+    # Мини-сайт для Render (чтобы не засыпал)
+    app = web.Application()
+    app.router.add_get("/", handle_ping)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    port = int(os.environ.get("PORT", 10000))
+    site = web.TCPSite(runner, '0.0.0.0', port)
+    
+    print(f"Server started on port {port}")
     await update_bot_profile_stats()
-    await dp.start_polling(bot)
+    
+    # Запускаем и бота, и сервер одновременно
+    await asyncio.gather(
+        site.start(),
+        dp.start_polling(bot)
+    )
 
 if __name__ == "__main__":
     asyncio.run(main())
