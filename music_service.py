@@ -9,7 +9,7 @@ from typing import Tuple, Optional, List, Dict
 def search_music_sync(query: str, max_results: int = 8) -> Optional[List[Dict]]:
     """
     Ищет треки на YouTube без скачивания. Возвращает список результатов.
-    Обновлено для обхода блокировок на Render (IPv4 + User-Agent).
+    Обновлено для обхода блокировок на Render (IPv4 + Android Client).
     """
     ydl_opts = {
         'format': 'bestaudio/best',
@@ -19,18 +19,22 @@ def search_music_sync(query: str, max_results: int = 8) -> Optional[List[Dict]]:
         'noplaylist': True,
         'extract_flat': True,
         'nocheckcertificate': True,
-        'source_address': '0.0.0.0', # Принудительно IPv4 (решает проблему 403 на Render)
+        'source_address': '0.0.0.0', # Принудительно IPv4
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['android', 'web'],
+                'skip': ['dash', 'hls'],
+            }
+        },
         'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+            'User-Agent': 'Mozilla/5.0 (Linux; Android 10; SM-G960F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.127 Mobile Safari/537.36',
+            'Accept': '*/*',
             'Accept-Language': 'en-US,en;q=0.5',
-            'Referer': 'https://www.google.com/',
         }
     }
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # Используем ytsearch без лимита внутри строки, если нужно 8 результатов
             info = ydl.extract_info(f"ytsearch{max_results}:{query}", download=False)
 
             if 'entries' not in info or not info['entries']:
@@ -60,18 +64,23 @@ def search_music_sync(query: str, max_results: int = 8) -> Optional[List[Dict]]:
 def download_by_id_sync(video_id: str) -> Optional[Tuple[str, str, str, int]]:
     """
     Скачивает конкретное видео (аудио) по его ID.
-    Обновлено для работы на серверных IP.
+    Обновлено для работы на серверных IP через Android Client.
     """
     ydl_opts = {
-        'format': 'bestaudio[ext=m4a]/bestaudio/best',
+        'format': 'bestaudio/best', # Самый универсальный формат
         'outtmpl': 'downloads/%(id)s.%(ext)s',
         'noplaylist': True,
         'quiet': True,
         'no_warnings': True,
         'nocheckcertificate': True,
         'source_address': '0.0.0.0',
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['android'], # Эмулируем телефон
+            }
+        },
         'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'User-Agent': 'Mozilla/5.0 (Linux; Android 11; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Mobile Safari/537.36',
         }
     }
 
@@ -100,7 +109,7 @@ def download_by_id_sync(video_id: str) -> Optional[Tuple[str, str, str, int]]:
                 info.get('duration', 0)
             )
     except Exception as e:
-        print(f"Ошибка при скачивании: {e}")
+        print(f"Ошибка при скачивании по ID: {e}")
         return None
 
 
@@ -134,15 +143,18 @@ def is_supported_url(text: str) -> Optional[str]:
 
 def download_audio_from_url_sync(url: str) -> Optional[Dict]:
     ydl_opts = {
-        'format': 'bestaudio[ext=m4a]/bestaudio/best',
+        'format': 'bestaudio/best',
         'outtmpl': 'downloads/%(id)s_audio.%(ext)s',
         'noplaylist': True,
         'quiet': True,
         'no_warnings': True,
         'nocheckcertificate': True,
         'source_address': '0.0.0.0',
+        'extractor_args': {
+            'youtube': { 'player_client': ['android'] }
+        },
         'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'User-Agent': 'Mozilla/5.0 (Linux; Android 11; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Mobile Safari/537.36',
         }
     }
 
@@ -188,7 +200,7 @@ def download_video_from_url_sync(url: str) -> Optional[Dict]:
         'source_address': '0.0.0.0',
         'merge_output_format': 'mp4',
         'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'User-Agent': 'Mozilla/5.0 (Linux; Android 11; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Mobile Safari/537.36',
         }
     }
 
